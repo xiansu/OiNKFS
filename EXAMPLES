@@ -1,0 +1,196 @@
+EXAMPLES
+========
+
+First, please take a look at example1.png and example2.png
+
+Second, you'll notice that your files may be colored white on a blue background.
+That's normal. It means that there are multiple entries pointed at the inode.
+
+Now let's go over what we did:
+xian@sammael:~/oinkfs> df
+Filesystem           1K-blocks      Used Available Use% Mounted on
+/dev/md1              139G   48G   85G  36% /
+/dev/md6               15T   12T  3.0T  80% /media/raid
+oinkfs                 15T   12T  3.0T  80% /media/raid/oinkfs
+
+Notice that oinkfs mirrors /dev/md6, which is normal because it's just
+presenting the /media/raid/links/ directory at /media/raid/oinkfs
+
+Take a look at the directories below.
+
+You'll see that links/ has both the files and the patch files. Also, the files
+in links/ are HARDLINKS to PERM_ROOT or ORIG_ROOT. Hard links are pointers to
+the exact same inode as the files in PERM_ROOT and ORIG_ROOT.
+
+xian@sammael:~> ls -la /media/raid/links/waffles/The\ Shins\ -\ Port\ of\ Morrow
+...
+-rw-r--r-- 2 root root 31696319 2012-10-01 12:49 02 - Simple Song.flac
+-rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 02 - Simple Song.flac.rdiff
+...
+
+The flac itself is a hardlink to
+ /media/raid/music/The Shins - Port of Morrow/02. The Shins - Simple Song.flac
+(The 2 before root means that there are 2 entries pointing to this file)
+
+
+Similarly, you'll remember that some files did not have matches, such as
+ /media/raid/oink/what/The Smiths - The Smiths/00 - Tracklisting.jpg
+
+xian@sammael:~> ls -la /media/raid/links/what/The\ Smiths\ -\ The\ Smiths
+...
+-rw-r--r-- 2 root root  2134265 2011-04-03 07:33 00 - Tracklisting.jpg
+...
+
+This file is a hardlink to /media/raid/oink/what/...
+
+If the album in /media/raid/oink/what/... is moved off the device (/media/raid),
+the 2 will become a 1 and this will remain as a regular file with only 1 entry.
+So files that are not matched end up just being links to ORIG_ROOT or copies if
+ORIG_ROOT counterpart is removed.
+
+It's best not to fuck with /media/raid/{links/oinkfs}/tmp/ except to delete the
+temporary files created on reads. You can also look at the log. A tail -f on the
+log in conky file would be cool to see when files are accessed (presumably from
+a program like... well, let's not get into that).
+
+You'll notice below that there is only 1 flac in tmp/. That's because that's the
+file we md5sum'd in example2.png. If I had done md5sum *, all the flac files
+that had corresponding .rdiff files would have been created in temp. The cue/log
+files don't have .rdiff files so are just read straight.
+
+xian@sammael:~> find /media/raid/links/ | sort
+/media/raid/links/
+/media/raid/links/tmp
+/media/raid/links/tmp/oinkfs.log
+/media/raid/links/tmp/waffles
+/media/raid/links/tmp/waffles/The Shins - Port of Morrow
+/media/raid/links/tmp/waffles/The Shins - Port of Morrow/02 - Simple Song.flac
+/media/raid/links/waffles
+/media/raid/links/waffles/The Shins - Port of Morrow
+/media/raid/links/waffles/The Shins - Port of Morrow/01 - The Rifle’s Spiral.flac
+/media/raid/links/waffles/The Shins - Port of Morrow/01 - The Rifle’s Spiral.flac.rdiff
+/media/raid/links/waffles/The Shins - Port of Morrow/02 - Simple Song.flac
+/media/raid/links/waffles/The Shins - Port of Morrow/02 - Simple Song.flac.rdiff
+/media/raid/links/waffles/The Shins - Port of Morrow/03 - It’s Only Life.flac
+/media/raid/links/waffles/The Shins - Port of Morrow/03 - It’s Only Life.flac.rdiff
+/media/raid/links/waffles/The Shins - Port of Morrow/04 - Bait and Switch.flac
+/media/raid/links/waffles/The Shins - Port of Morrow/04 - Bait and Switch.flac.rdiff
+/media/raid/links/waffles/The Shins - Port of Morrow/05 - September.flac
+/media/raid/links/waffles/The Shins - Port of Morrow/05 - September.flac.rdiff
+/media/raid/links/waffles/The Shins - Port of Morrow/06 - No Way Down.flac
+/media/raid/links/waffles/The Shins - Port of Morrow/06 - No Way Down.flac.rdiff
+/media/raid/links/waffles/The Shins - Port of Morrow/07 - For a Fool.flac
+/media/raid/links/waffles/The Shins - Port of Morrow/07 - For a Fool.flac.rdiff
+/media/raid/links/waffles/The Shins - Port of Morrow/08 - Fall of ’82.flac
+/media/raid/links/waffles/The Shins - Port of Morrow/08 - Fall of ’82.flac.rdiff
+/media/raid/links/waffles/The Shins - Port of Morrow/09 - 40 Mark Strasse.flac
+/media/raid/links/waffles/The Shins - Port of Morrow/09 - 40 Mark Strasse.flac.rdiff
+/media/raid/links/waffles/The Shins - Port of Morrow/10 - Port of Morrow.flac
+/media/raid/links/waffles/The Shins - Port of Morrow/10 - Port of Morrow.flac.rdiff
+/media/raid/links/waffles/The Shins - Port of Morrow/11 - Pariah King.flac
+/media/raid/links/waffles/The Shins - Port of Morrow/11 - Pariah King.flac.rdiff
+/media/raid/links/waffles/The Shins - Port of Morrow/12 - The Waltz Is Over.flac
+/media/raid/links/waffles/The Shins - Port of Morrow/12 - The Waltz Is Over.flac.rdiff
+/media/raid/links/waffles/The Shins - Port of Morrow/Port Of Morrow (Japanese Edition).cue
+/media/raid/links/waffles/The Shins - Port of Morrow/Port Of Morrow (Japanese Edition).log
+/media/raid/links/what
+/media/raid/links/what/The Smiths - The Smiths
+/media/raid/links/what/The Smiths - The Smiths/00 - Cover.jpg
+/media/raid/links/what/The Smiths - The Smiths/00 - The Smiths.cue
+/media/raid/links/what/The Smiths - The Smiths/00 - The Smiths.log
+/media/raid/links/what/The Smiths - The Smiths/00 - The Smiths.m3u
+/media/raid/links/what/The Smiths - The Smiths/00 - Tracklisting.jpg
+/media/raid/links/what/The Smiths - The Smiths/01 - Reel Around The Fountain.flac
+/media/raid/links/what/The Smiths - The Smiths/01 - Reel Around The Fountain.flac.rdiff
+/media/raid/links/what/The Smiths - The Smiths/02 - You've Got Everything Now.flac
+/media/raid/links/what/The Smiths - The Smiths/02 - You've Got Everything Now.flac.rdiff
+/media/raid/links/what/The Smiths - The Smiths/03 - Miserable Lie.flac
+/media/raid/links/what/The Smiths - The Smiths/03 - Miserable Lie.flac.rdiff
+/media/raid/links/what/The Smiths - The Smiths/04 - Pretty Girls Make Graves.flac
+/media/raid/links/what/The Smiths - The Smiths/04 - Pretty Girls Make Graves.flac.rdiff
+/media/raid/links/what/The Smiths - The Smiths/05 - The Hand That Rocks The Cradle.flac
+/media/raid/links/what/The Smiths - The Smiths/05 - The Hand That Rocks The Cradle.flac.rdiff
+/media/raid/links/what/The Smiths - The Smiths/06 - This Charming Man.flac
+/media/raid/links/what/The Smiths - The Smiths/06 - This Charming Man.flac.rdiff
+/media/raid/links/what/The Smiths - The Smiths/07 - Still Ill.flac
+/media/raid/links/what/The Smiths - The Smiths/07 - Still Ill.flac.rdiff
+/media/raid/links/what/The Smiths - The Smiths/08 - Hand In Glove.flac
+/media/raid/links/what/The Smiths - The Smiths/08 - Hand In Glove.flac.rdiff
+/media/raid/links/what/The Smiths - The Smiths/09 - What Difference Does It Make.flac
+/media/raid/links/what/The Smiths - The Smiths/09 - What Difference Does It Make.flac.rdiff
+/media/raid/links/what/The Smiths - The Smiths/10 - I Don't Owe You Anything.flac
+/media/raid/links/what/The Smiths - The Smiths/10 - I Don't Owe You Anything.flac.rdiff
+/media/raid/links/what/The Smiths - The Smiths/11 - Suffer Little Children.flac
+/media/raid/links/what/The Smiths - The Smiths/11 - Suffer Little Children.flac.rdiff
+/media/raid/links/what/The Smiths - The Smiths/Folder.jpg
+
+xian@sammael:~> find /media/raid/oinkfs/ | sort
+/media/raid/oinkfs/
+/media/raid/oinkfs/tmp
+/media/raid/oinkfs/tmp/oinkfs.log
+/media/raid/oinkfs/tmp/waffles
+/media/raid/oinkfs/tmp/waffles/The Shins - Port of Morrow
+/media/raid/oinkfs/tmp/waffles/The Shins - Port of Morrow/02 - Simple Song.flac
+/media/raid/oinkfs/waffles
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/01 - The Rifle’s Spiral.flac
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/02 - Simple Song.flac
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/03 - It’s Only Life.flac
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/04 - Bait and Switch.flac
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/05 - September.flac
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/06 - No Way Down.flac
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/07 - For a Fool.flac
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/08 - Fall of ’82.flac
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/09 - 40 Mark Strasse.flac
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/10 - Port of Morrow.flac
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/11 - Pariah King.flac
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/12 - The Waltz Is Over.flac
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/Port Of Morrow (Japanese Edition).cue
+/media/raid/oinkfs/waffles/The Shins - Port of Morrow/Port Of Morrow (Japanese Edition).log
+/media/raid/oinkfs/what
+/media/raid/oinkfs/what/The Smiths - The Smiths
+/media/raid/oinkfs/what/The Smiths - The Smiths/00 - Cover.jpg
+/media/raid/oinkfs/what/The Smiths - The Smiths/00 - The Smiths.cue
+/media/raid/oinkfs/what/The Smiths - The Smiths/00 - The Smiths.log
+/media/raid/oinkfs/what/The Smiths - The Smiths/00 - The Smiths.m3u
+/media/raid/oinkfs/what/The Smiths - The Smiths/00 - Tracklisting.jpg
+/media/raid/oinkfs/what/The Smiths - The Smiths/01 - Reel Around The Fountain.flac
+/media/raid/oinkfs/what/The Smiths - The Smiths/02 - You've Got Everything Now.flac
+/media/raid/oinkfs/what/The Smiths - The Smiths/03 - Miserable Lie.flac
+/media/raid/oinkfs/what/The Smiths - The Smiths/04 - Pretty Girls Make Graves.flac
+/media/raid/oinkfs/what/The Smiths - The Smiths/05 - The Hand That Rocks The Cradle.flac
+/media/raid/oinkfs/what/The Smiths - The Smiths/06 - This Charming Man.flac
+/media/raid/oinkfs/what/The Smiths - The Smiths/07 - Still Ill.flac
+/media/raid/oinkfs/what/The Smiths - The Smiths/08 - Hand In Glove.flac
+/media/raid/oinkfs/what/The Smiths - The Smiths/09 - What Difference Does It Make.flac
+/media/raid/oinkfs/what/The Smiths - The Smiths/10 - I Don't Owe You Anything.flac
+/media/raid/oinkfs/what/The Smiths - The Smiths/11 - Suffer Little Children.flac
+/media/raid/oinkfs/what/The Smiths - The Smiths/Folder.jpg
+
+xian@sammael:~> ls -laR /media/raid/links | awk '/rdiff$/{print; size+=$5} END {print size}'
+-rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 01 - The Rifle’s Spiral.flac.rdiff
+-rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 02 - Simple Song.flac.rdiff
+-rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 03 - It’s Only Life.flac.rdiff
+-rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 04 - Bait and Switch.flac.rdiff
+-rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 05 - September.flac.rdiff
+-rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 06 - No Way Down.flac.rdiff
+-rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 07 - For a Fool.flac.rdiff
+-rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 08 - Fall of ’82.flac.rdiff
+-rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 09 - 40 Mark Strasse.flac.rdiff
+-rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 10 - Port of Morrow.flac.rdiff
+-rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 11 - Pariah King.flac.rdiff
+-rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 12 - The Waltz Is Over.flac.rdiff
+-rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 01 - Reel Around The Fountain.flac.rdiff
+-rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 02 - You've Got Everything Now.flac.rdiff
+-rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 03 - Miserable Lie.flac.rdiff
+-rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 04 - Pretty Girls Make Graves.flac.rdiff
+-rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 05 - The Hand That Rocks The Cradle.flac.rdiff
+-rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 06 - This Charming Man.flac.rdiff
+-rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 07 - Still Ill.flac.rdiff
+-rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 08 - Hand In Glove.flac.rdiff
+-rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 09 - What Difference Does It Make.flac.rdiff
+-rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 10 - I Don't Owe You Anything.flac.rdiff
+-rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 11 - Suffer Little Children.flac.rdiff
+47803
+
+Why keep 621.68MB in duplicates when the difference between them is only 48KB?
