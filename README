@@ -3,6 +3,9 @@ OiNKFS
 
 PLEASE read this file in its entirety before doing anything. Also, EXAMPLES.
 
+At the moment, OiNKFS is in its proof of concept stage. Things should work, but
+I have not done any testing on it with large data sets yet.
+
 Let's FAQ.
 
 Q. Any dependencies? The versions are just what I used, different ones may work.
