@@ -76,10 +76,14 @@ A. You can create a cronjob to delete files not access over an hour:
 
 Q. So I'll be able to save 50% of my space if I previously had 2 copies of my
    music files on my hard drive?
-A. Almost. The patches should only add a negligible amount of space (in my test
-   run, 18 matched albums with 187 flac files created less than 2 megs of patch
-   files). There is also the matter of tmp files written by oinkfs, which should
-   also be negligible compared to your library and can be flushed at anytime.
+A. Almost, or more. The patches should only add a negligible amount of space (in
+   my test run, 18 matched albums with 187 flac files created less than 2 megs
+   of patch files). There is also the matter of tmp files written by oinkfs,
+   which should also be negligible compared to your library and can be flushed
+   at anytime. That's the almost. The more is if you may have multiple copies of
+   albums in different $whatever directories that match the same album in
+   PERM_ROOT. These copies can also differ from each other as well because the
+   patches are created with the PERM_ROOT copy as the basis.
 
 Q. I want to modify an album in my PERM_ROOT directory. What do I do?
 A. Just copy album from mounted oinkfs to ORIG_ROOT, delete the album in
