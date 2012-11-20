@@ -68,6 +68,9 @@ A. See the EXAMPLES file. But here is a quick summary:
    3. /path/to/oinkfs.py OINKFS_MOUNTPOINT
    4. look around OINKFS_MOUNTPOINT and check it out
 
+Q. How do I unmount this shit?
+A. fusermount -u OINKFS_MOUNTPOINT
+
 Q. If I don't set DEL_FILES in .oinkfs, I have to delete files myself?
 A. You can create a cronjob to delete files not access over an hour:
    find OINKFS_MOUNTPOINT/tmp -amin +60 -exec rm {} \;
