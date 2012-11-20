@@ -14,9 +14,9 @@ Q. What is OiNKFS?
 A. OiNKFS is a project consisting of 2 parts, oinkfs and oinklink.
 
    oinkfs is a filesystem run in usespace through FUSE. oinkfs is a relatively
-   transparent except when a patchfile exists. The patchfile is not show in
-   oinkfs and trying to open the file to patch the file into the tmp/ directory
-   of the root directory and open the file descriptor to the patched file.
+   transparent except when a patchfile exists. The patchfile is not shown in
+   oinkfs and trying to open the file will patch the file into the tmp directory
+   and open the file descriptor to the patched file.
 
    oinklink is a utility that will collect information about music albums found
    in two separate directories, one filled with organized albums (PERM_ROOT) and
