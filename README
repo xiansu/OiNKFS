@@ -4,7 +4,8 @@ OiNKFS
 PLEASE read this file in its entirety before doing anything. Also, EXAMPLES.
 
 At the moment, OiNKFS is in its proof of concept stage. Things should work, but
-I have not done any testing on it with large data sets yet.
+I have not done any testing on it with large data sets yet. This is release:
+   v0.1-proof_of_concept
 
 Let's FAQ.
 
