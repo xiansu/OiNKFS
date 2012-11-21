@@ -1,196 +1,84 @@
 EXAMPLES
 ========
 
-First, please take a look at example1.png and example2.png
+This is more of a walkthrough. So it will be long.
 
-Second, you'll notice that your files may be colored white on a blue background.
-That's normal. It means that there are multiple entries pointed at the inode.
+1. copy oinkfs.cfg as .oinkfs in your home directory and then modify it
+   cp /path/to/oinkfs.cfg ~/.oinkfs
 
-Now let's go over what we did:
-xian@sammael:~/oinkfs> df
-Filesystem           1K-blocks      Used Available Use% Mounted on
-/dev/md1              139G   48G   85G  36% /
-/dev/md6               15T   12T  3.0T  80% /media/raid
-oinkfs                 15T   12T  3.0T  80% /media/raid/oinkfs
+   This is optional but it'd be handy to have oinkfs and oinklink in your path:
+   sudo ln -s /path/to/oinkfs.py /usr/local/bin/oinkfs
+   sudo ln -s /path/to/oinklink.py /usr/local/bin/oinklink
 
-Notice that oinkfs mirrors /dev/md6, which is normal because it's just
-presenting the /media/raid/links/ directory at /media/raid/oinkfs
+2. Setting up your directories, PERM_ROOT and ORIG_ROOT.
+   PERM_ROOT should be structured as PERM_ROOT/$album
+   ORIG_ROOT should be structured as ORIG_ROOT/$whatever/$album
 
-Take a look at the directories below.
+   $album can be anything you want but they must match to be considered. For example, it can be "Artist - Album" or "Artist - Year - Album" or "Album".
+   $whatever can be whatever you want, except for "tmp", so that you can have multiple (possibly different) copies of albums in ORIG_ROOT. I have two $whatever
+   directories, one named "what" because I didn't know what to call it and one named "waffles", because I like to eat waffles.
 
-You'll see that links/ has both the files and the patch files. Also, the files
-in links/ are HARDLINKS to PERM_ROOT or ORIG_ROOT. Hard links are pointers to
-the exact same inode as the files in PERM_ROOT and ORIG_ROOT.
+   Other restrictions for files:
+   FLAC files inside PERM_ROOT must start with a 2 digit tracknumber. Ex: "01. Artist - Track.flac" or "01 - Track.flac"
+   FLAC files inside ORIG_ROOT must have 2 consecutive digit somewhere in the filename. Ex: "Artist - 01 - Track.flac" or "Weird Track Name 01.flac"
 
-xian@sammael:~> ls -la /media/raid/links/waffles/The\ Shins\ -\ Port\ of\ Morrow
-...
--rw-r--r-- 2 root root 31696319 2012-10-01 12:49 02 - Simple Song.flac
--rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 02 - Simple Song.flac.rdiff
-...
+3. Run oinklink:
+   /path/to/oinklink.py -or- oinklink (if you did the optional step in #1)
 
-The flac itself is a hardlink to
- /media/raid/music/The Shins - Port of Morrow/02. The Shins - Simple Song.flac
-(The 2 before root means that there are 2 entries pointing to this file)
+   See oinklink.png in the wiki.
 
+   You'll notice in my example that some files are green and some are red. The green ones are matched files and red ones are unmatched. This is correct as I do
+   not keep jpg's or m3u's in my organized directories. The important thing is that 23/23 flacs were matched, saving me 621.68MB.
 
-Similarly, you'll remember that some files did not have matches, such as
- /media/raid/oink/what/The Smiths - The Smiths/00 - Tracklisting.jpg
+   If you look inside LINK_ROOT, you will see the same directory structure as ORIG_ROOT, but the flac files will have accompanying .rdiff files, totalling 48KB.
+   xian@sammael:~> ls -laR /media/raid/links | awk '/rdiff$/{size+=$5} END {print size}'
+   47803
 
-xian@sammael:~> ls -la /media/raid/links/what/The\ Smiths\ -\ The\ Smiths
-...
--rw-r--r-- 2 root root  2134265 2011-04-03 07:33 00 - Tracklisting.jpg
-...
+4. Run oinkfs:
+   /path/to/oinkfs.py OINKFS_MP -or- oinkfs OINKFS_MP (if you did the optional step in #1)
 
-This file is a hardlink to /media/raid/oink/what/...
+   xian@sammael:~/oinkfs> df
+   Filesystem           1K-blocks      Used Available Use% Mounted on
+   /dev/md1              139G   48G   85G  36% /
+   /dev/md6               15T   12T  3.0T  80% /media/raid
+   oinkfs                 15T   12T  3.0T  80% /media/raid/oinkfs
 
-If the album in /media/raid/oink/what/... is moved off the device (/media/raid),
-the 2 will become a 1 and this will remain as a regular file with only 1 entry.
-So files that are not matched end up just being links to ORIG_ROOT or copies if
-ORIG_ROOT counterpart is removed.
+   If you look inside OINKFS_MP, you will see the files in LINK_ROOT without the .rdiff files. If you try to open the files, it will first patch them into
+   OINKFS_MP/tmp and then open the file descriptor to that file.
 
-It's best not to fuck with /media/raid/{links/oinkfs}/tmp/ except to delete the
-temporary files created on reads. You can also look at the log. A tail -f on the
-log in conky file would be cool to see when files are accessed (presumably from
-a program like... well, let's not get into that).
+   Let's try some md5sum's:
+   PERM_ROOT: e5f9e2e4cb86f380856fe0fdc50104df  /media/raid/music/The Shins - Port of Morrow/02. The Shins - Simple Song.flac
+   ORIG_ROOT: d5367de8d4ae9f1483eb825520ab7664  /media/raid/oink/waffles/The Shins - Port of Morrow/02 - Simple Song.flac
+   LINK_ROOT: e5f9e2e4cb86f380856fe0fdc50104df  /media/raid/links/waffles/The Shins - Port of Morrow/02 - Simple Song.flac
+   OINKFS_MP: d5367de8d4ae9f1483eb825520ab7664  /media/raid/oinkfs/waffles/The Shins - Port of Morrow/02 - Simple Song.flac
 
-You'll notice below that there is only 1 flac in tmp/. That's because that's the
-file we md5sum'd in example2.png. If I had done md5sum *, all the flac files
-that had corresponding .rdiff files would have been created in temp. The cue/log
-files don't have .rdiff files so are just read straight.
+   You can now backup and remove the album in ORIG_ROOT. The only copy on your drive will be the one in PERM_ROOT, the link in LINK_ROOT and the patch file.
+   Because your only copy is now in PERM_ROOT, you must NOT change this file, or you will lose the original file. See the FAQ below for how to modify PERM_ROOT.
 
-xian@sammael:~> find /media/raid/links/ | sort
-/media/raid/links/
-/media/raid/links/tmp
-/media/raid/links/tmp/oinkfs.log
-/media/raid/links/tmp/waffles
-/media/raid/links/tmp/waffles/The Shins - Port of Morrow
-/media/raid/links/tmp/waffles/The Shins - Port of Morrow/02 - Simple Song.flac
-/media/raid/links/waffles
-/media/raid/links/waffles/The Shins - Port of Morrow
-/media/raid/links/waffles/The Shins - Port of Morrow/01 - The Rifle’s Spiral.flac
-/media/raid/links/waffles/The Shins - Port of Morrow/01 - The Rifle’s Spiral.flac.rdiff
-/media/raid/links/waffles/The Shins - Port of Morrow/02 - Simple Song.flac
-/media/raid/links/waffles/The Shins - Port of Morrow/02 - Simple Song.flac.rdiff
-/media/raid/links/waffles/The Shins - Port of Morrow/03 - It’s Only Life.flac
-/media/raid/links/waffles/The Shins - Port of Morrow/03 - It’s Only Life.flac.rdiff
-/media/raid/links/waffles/The Shins - Port of Morrow/04 - Bait and Switch.flac
-/media/raid/links/waffles/The Shins - Port of Morrow/04 - Bait and Switch.flac.rdiff
-/media/raid/links/waffles/The Shins - Port of Morrow/05 - September.flac
-/media/raid/links/waffles/The Shins - Port of Morrow/05 - September.flac.rdiff
-/media/raid/links/waffles/The Shins - Port of Morrow/06 - No Way Down.flac
-/media/raid/links/waffles/The Shins - Port of Morrow/06 - No Way Down.flac.rdiff
-/media/raid/links/waffles/The Shins - Port of Morrow/07 - For a Fool.flac
-/media/raid/links/waffles/The Shins - Port of Morrow/07 - For a Fool.flac.rdiff
-/media/raid/links/waffles/The Shins - Port of Morrow/08 - Fall of ’82.flac
-/media/raid/links/waffles/The Shins - Port of Morrow/08 - Fall of ’82.flac.rdiff
-/media/raid/links/waffles/The Shins - Port of Morrow/09 - 40 Mark Strasse.flac
-/media/raid/links/waffles/The Shins - Port of Morrow/09 - 40 Mark Strasse.flac.rdiff
-/media/raid/links/waffles/The Shins - Port of Morrow/10 - Port of Morrow.flac
-/media/raid/links/waffles/The Shins - Port of Morrow/10 - Port of Morrow.flac.rdiff
-/media/raid/links/waffles/The Shins - Port of Morrow/11 - Pariah King.flac
-/media/raid/links/waffles/The Shins - Port of Morrow/11 - Pariah King.flac.rdiff
-/media/raid/links/waffles/The Shins - Port of Morrow/12 - The Waltz Is Over.flac
-/media/raid/links/waffles/The Shins - Port of Morrow/12 - The Waltz Is Over.flac.rdiff
-/media/raid/links/waffles/The Shins - Port of Morrow/Port Of Morrow (Japanese Edition).cue
-/media/raid/links/waffles/The Shins - Port of Morrow/Port Of Morrow (Japanese Edition).log
-/media/raid/links/what
-/media/raid/links/what/The Smiths - The Smiths
-/media/raid/links/what/The Smiths - The Smiths/00 - Cover.jpg
-/media/raid/links/what/The Smiths - The Smiths/00 - The Smiths.cue
-/media/raid/links/what/The Smiths - The Smiths/00 - The Smiths.log
-/media/raid/links/what/The Smiths - The Smiths/00 - The Smiths.m3u
-/media/raid/links/what/The Smiths - The Smiths/00 - Tracklisting.jpg
-/media/raid/links/what/The Smiths - The Smiths/01 - Reel Around The Fountain.flac
-/media/raid/links/what/The Smiths - The Smiths/01 - Reel Around The Fountain.flac.rdiff
-/media/raid/links/what/The Smiths - The Smiths/02 - You've Got Everything Now.flac
-/media/raid/links/what/The Smiths - The Smiths/02 - You've Got Everything Now.flac.rdiff
-/media/raid/links/what/The Smiths - The Smiths/03 - Miserable Lie.flac
-/media/raid/links/what/The Smiths - The Smiths/03 - Miserable Lie.flac.rdiff
-/media/raid/links/what/The Smiths - The Smiths/04 - Pretty Girls Make Graves.flac
-/media/raid/links/what/The Smiths - The Smiths/04 - Pretty Girls Make Graves.flac.rdiff
-/media/raid/links/what/The Smiths - The Smiths/05 - The Hand That Rocks The Cradle.flac
-/media/raid/links/what/The Smiths - The Smiths/05 - The Hand That Rocks The Cradle.flac.rdiff
-/media/raid/links/what/The Smiths - The Smiths/06 - This Charming Man.flac
-/media/raid/links/what/The Smiths - The Smiths/06 - This Charming Man.flac.rdiff
-/media/raid/links/what/The Smiths - The Smiths/07 - Still Ill.flac
-/media/raid/links/what/The Smiths - The Smiths/07 - Still Ill.flac.rdiff
-/media/raid/links/what/The Smiths - The Smiths/08 - Hand In Glove.flac
-/media/raid/links/what/The Smiths - The Smiths/08 - Hand In Glove.flac.rdiff
-/media/raid/links/what/The Smiths - The Smiths/09 - What Difference Does It Make.flac
-/media/raid/links/what/The Smiths - The Smiths/09 - What Difference Does It Make.flac.rdiff
-/media/raid/links/what/The Smiths - The Smiths/10 - I Don't Owe You Anything.flac
-/media/raid/links/what/The Smiths - The Smiths/10 - I Don't Owe You Anything.flac.rdiff
-/media/raid/links/what/The Smiths - The Smiths/11 - Suffer Little Children.flac
-/media/raid/links/what/The Smiths - The Smiths/11 - Suffer Little Children.flac.rdiff
-/media/raid/links/what/The Smiths - The Smiths/Folder.jpg
+   If you look inside OINKFS_MP/tmp, you will see 2 files, the song we just md5sum'd and oinkfs.log which if you look inside, you will see:
+   2012/11/21 04:23:17 creating ./tmp/waffles/The Shins - Port of Morrow/02 - Simple Song.flac
+   You can also delete the files in OINKFS_MP/tmp at anytime because they will be re-created whenever they are opened.
 
-xian@sammael:~> find /media/raid/oinkfs/ | sort
-/media/raid/oinkfs/
-/media/raid/oinkfs/tmp
-/media/raid/oinkfs/tmp/oinkfs.log
-/media/raid/oinkfs/tmp/waffles
-/media/raid/oinkfs/tmp/waffles/The Shins - Port of Morrow
-/media/raid/oinkfs/tmp/waffles/The Shins - Port of Morrow/02 - Simple Song.flac
-/media/raid/oinkfs/waffles
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/01 - The Rifle’s Spiral.flac
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/02 - Simple Song.flac
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/03 - It’s Only Life.flac
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/04 - Bait and Switch.flac
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/05 - September.flac
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/06 - No Way Down.flac
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/07 - For a Fool.flac
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/08 - Fall of ’82.flac
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/09 - 40 Mark Strasse.flac
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/10 - Port of Morrow.flac
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/11 - Pariah King.flac
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/12 - The Waltz Is Over.flac
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/Port Of Morrow (Japanese Edition).cue
-/media/raid/oinkfs/waffles/The Shins - Port of Morrow/Port Of Morrow (Japanese Edition).log
-/media/raid/oinkfs/what
-/media/raid/oinkfs/what/The Smiths - The Smiths
-/media/raid/oinkfs/what/The Smiths - The Smiths/00 - Cover.jpg
-/media/raid/oinkfs/what/The Smiths - The Smiths/00 - The Smiths.cue
-/media/raid/oinkfs/what/The Smiths - The Smiths/00 - The Smiths.log
-/media/raid/oinkfs/what/The Smiths - The Smiths/00 - The Smiths.m3u
-/media/raid/oinkfs/what/The Smiths - The Smiths/00 - Tracklisting.jpg
-/media/raid/oinkfs/what/The Smiths - The Smiths/01 - Reel Around The Fountain.flac
-/media/raid/oinkfs/what/The Smiths - The Smiths/02 - You've Got Everything Now.flac
-/media/raid/oinkfs/what/The Smiths - The Smiths/03 - Miserable Lie.flac
-/media/raid/oinkfs/what/The Smiths - The Smiths/04 - Pretty Girls Make Graves.flac
-/media/raid/oinkfs/what/The Smiths - The Smiths/05 - The Hand That Rocks The Cradle.flac
-/media/raid/oinkfs/what/The Smiths - The Smiths/06 - This Charming Man.flac
-/media/raid/oinkfs/what/The Smiths - The Smiths/07 - Still Ill.flac
-/media/raid/oinkfs/what/The Smiths - The Smiths/08 - Hand In Glove.flac
-/media/raid/oinkfs/what/The Smiths - The Smiths/09 - What Difference Does It Make.flac
-/media/raid/oinkfs/what/The Smiths - The Smiths/10 - I Don't Owe You Anything.flac
-/media/raid/oinkfs/what/The Smiths - The Smiths/11 - Suffer Little Children.flac
-/media/raid/oinkfs/what/The Smiths - The Smiths/Folder.jpg
+Q. More FAQs?
+A. Seriously? Sigh...
 
-xian@sammael:~> ls -laR /media/raid/links | awk '/rdiff$/{print; size+=$5} END {print size}'
--rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 01 - The Rifle’s Spiral.flac.rdiff
--rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 02 - Simple Song.flac.rdiff
--rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 03 - It’s Only Life.flac.rdiff
--rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 04 - Bait and Switch.flac.rdiff
--rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 05 - September.flac.rdiff
--rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 06 - No Way Down.flac.rdiff
--rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 07 - For a Fool.flac.rdiff
--rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 08 - Fall of ’82.flac.rdiff
--rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 09 - 40 Mark Strasse.flac.rdiff
--rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 10 - Port of Morrow.flac.rdiff
--rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 11 - Pariah King.flac.rdiff
--rw-r--r-- 1 xian xian     2076 2012-11-20 11:45 12 - The Waltz Is Over.flac.rdiff
--rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 01 - Reel Around The Fountain.flac.rdiff
--rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 02 - You've Got Everything Now.flac.rdiff
--rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 03 - Miserable Lie.flac.rdiff
--rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 04 - Pretty Girls Make Graves.flac.rdiff
--rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 05 - The Hand That Rocks The Cradle.flac.rdiff
--rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 06 - This Charming Man.flac.rdiff
--rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 07 - Still Ill.flac.rdiff
--rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 08 - Hand In Glove.flac.rdiff
--rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 09 - What Difference Does It Make.flac.rdiff
--rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 10 - I Don't Owe You Anything.flac.rdiff
--rw-r--r-- 1 xian xian     2081 2012-11-20 11:45 11 - Suffer Little Children.flac.rdiff
-47803
+Q. How do I unmount this shit?
+A. fusermount -u OINKFS_MOUNTPOINT
 
-Why keep 621.68MB in duplicates when the difference between them is only 48KB?
+Q. If I don't set DEL_FILES in .oinkfs, I have to delete files myself?
+A. You can create a cronjob to delete files not access over an hour: find OINKFS_MOUNTPOINT/tmp -amin +60 -exec rm {} \;
+                    or to delete files not accessed for over a week: find OINKFS_MOUNTPOINT/tmp -atime +7 -exec rm {} \;
+
+Q. Why are my files suddenly colored white on a blue background?
+A. That's normal. It means that there are multiple entries pointed at the inode.
+
+Q. I want to modify an album in my PERM_ROOT directory. What do I do?
+A. Just copy album from OINKFS_MP to ORIG_ROOT, delete the album in LINK_ROOT, and then modify the album in PERM_ROOT. Next time oinklink is run, it will relink
+   and repatch the album.
+
+Q. How do I manually create patches?
+A. optional: 1. md5sum ORIG_FILE
+             2. rdiff signature PERM_FILE PERM_FILE.sig
+             3. rdiff delta PERM_FILE.sig ORIG_FILE PERM_FILE.rdiff
+   optional: 4. rdiff patch PERM_FILE PERM_FILE.rdiff | md5sum
+   Check #1 and #4 to see if they match. Place PERM_FILE and PERM_FILE.rdiff in LINK_ROOT and you should now be able to open ORIG_FILE through OINKFS_MP.

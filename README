@@ -1,85 +1,35 @@
 OiNKFS
 ======
 
-PLEASE read this file in its entirety before doing anything. Also, EXAMPLES.
+Please see the wiki for a walkthrough on using OiNKFS.
+
+Homepages for OiNKFS:
+    https://sourceforge.net/p/oinkfs
+    https://github.com/xiansu/OiNKFS
+
+OiNKFS is written by Xian Su <xian.w.su@gmail.com> and licensed under GPLv3.
 
 At the moment, OiNKFS is in its proof of concept stage. Things should work, but
 I have not done any testing on it with large data sets yet. This is release:
    v0.1-proof_of_concept
 
-Let's FAQ.
+Dependencies: python-2.6.5
+              python-fuse-0.2
+              librsync-0.9.7
 
-Q. Any dependencies? The versions are just what I used, different ones may work.
-A. python-2.6.5
-   python-fuse-0.2
-   librsync-0.9.7
+OiNKFS is a project consisting of 2 parts, oinkfs and oinklink.
 
-Q. What is OiNKFS?
-A. OiNKFS is a project consisting of 2 parts, oinkfs and oinklink.
+oinkfs is a filesystem run in usespace through FUSE. oinkfs will present a
+filesystem that patches files that have corresponding patch files on the fly.
 
-   oinkfs is a filesystem run in usespace through FUSE. oinkfs is a relatively
-   transparent except when a patchfile exists. The patchfile is not shown in
-   oinkfs and trying to open the file will patch the file into the tmp directory
-   and open the file descriptor to the patched file.
+oinklink is a utility that will match music albums in FLAC format from two
+sources, a preferred source that is appropriately retagged and renamed, and a
+second source which is the original copy. oinklink will recreate the directory
+structure of the original copies while linking to the preferred copy in a third
+directory and creating patch files for them. When these files are opened through
+oinkfs, they will be patched on the fly to recreate the original files.
 
-   oinklink is a utility that will collect information about music albums found
-   in two separate directories, one filled with organized albums (PERM_ROOT) and
-   the other with the original versions of those albums (ORIG_ROOT). It will
-   create the same directory tree structure in a third directory (LINK_ROOT) as
-   the second (ORIG_ROOT). Inside the third directory, it will create hardlinks
-   to the files in PERM_ROOT if the md5sum matches (for flac files, just the md5
-   of the audio stream is matched. for all other files, the md5 of the entire
-   file is matched). Otherwise, it will create a hardlink to the files in
-   ORIG_ROOT which do not have matching files. A patch file between the flac
-   files is created and placed into LINK_ROOT. The purpose of this is to now
-   mount LINK_ROOT through oinkfs. You can now safely backup and remove (as the
-   hardlink of unmatched files from ORIG_ROOT will remain as copies) albums from
-   ORIG_ROOT. PERM_ROOT will remain and oinkfs mounted on LINK_ROOT will provide
-   on the fly patching to recreate ORIG_ROOT files.
-
-   Here is how the directories should be structured
-   PERM_ROOT/$album
-   ORIG_ROOT/$whatever/$album
-
-   $album can be anything you want but they must match to be considered. For
-   example, it can be "Artist - Album" or "Artist - Year - Album" or "Album"
-   whatever can be whatever you want, so that you can have multiple (possibly
-   different) copies of albums in ORIG_ROOT. I have two $whatever directories,
-   one named "what" because I didn't know what to call it and one named
-   "waffles", because I like to eat waffles.
-
-Q. Are there any other important things?
-A. Each flac file should have at least one instance of 2 consecutive digits.
-   And $whatever in ORIG_ROOT should not be "tmp" as "tmp" is a reserved
-   directory in the top directory of OINKFS_MOUNTPOINT.
-
-   *****************************************************************************
-   *IMPORTANT* oinklink does NOT require anything but read access to either
-   directories, PERM_ROOT or ORIG_ROOT and both of them can be read-only. I have
-   mine chown'd to root and read only.
-
-   Do NOT use oinkfs as anything else other than a read-only filesystem. Nothing
-   has been tested. The whole reason a lot of filesystem functions weren't just
-   completely disabled is because I'm too lazy to do so. Also, keep in mind that
-   if you modify files, the file that's actually open is the copy in the tmp/
-   directory, so when that file is deleted, the changes are also.
-   *****************************************************************************
-
-Q. How do I run stuff?
-A. See the EXAMPLES file. But here is a quick summary:
-   1. copy .oinkfs to your home directory and modify
-   2. /path/to/oinklink.py
-   3. /path/to/oinkfs.py OINKFS_MOUNTPOINT
-   4. look around OINKFS_MOUNTPOINT and check it out
-
-Q. How do I unmount this shit?
-A. fusermount -u OINKFS_MOUNTPOINT
-
-Q. If I don't set DEL_FILES in .oinkfs, I have to delete files myself?
-A. You can create a cronjob to delete files not access over an hour:
-   find OINKFS_MOUNTPOINT/tmp -amin +60 -exec rm {} \;
-   files not accessed for over a week:
-   find OINKFS_MOUNTPOINT/tmp -atime +7 -exec rm {} \;
+That is all. On to the FAQ:
 
 Q. So I'll be able to save 50% of my space if I previously had 2 copies of my
    music files on my hard drive?
@@ -88,23 +38,7 @@ A. Almost, or more. The patches should only add a negligible amount of space (in
    of patch files). There is also the matter of tmp files written by oinkfs,
    which should also be negligible compared to your library and can be flushed
    at anytime. That's the almost. The more is if you may have multiple copies of
-   albums in different $whatever directories that match the same album in
-   PERM_ROOT. These copies can also differ from each other as well because the
-   patches are created with the PERM_ROOT copy as the basis.
-
-Q. I want to modify an album in my PERM_ROOT directory. What do I do?
-A. Just copy album from mounted oinkfs to ORIG_ROOT, delete the album in
-   LINK_ROOT, and then modify the album in PERM_ROOT. Next time oinklink is run,
-   it will relink and repatch the album.
-
-Q. How do I manually create patches?
-A. 1. md5sum ORIG_FILE
-   2. rdiff signature PERM_FILE PERM_FILE.sig
-   3. rdiff delta PERM_FILE.sig ORIG_FILE PERM_FILE.rdiff
-   4. rdiff patch PERM_FILE PERM_FILE.rdiff | md5sum
-   Check #1 and #4
-   Place PERM_FILE and PERM_FILE.rdiff in LINK_ROOT and oinkfs should now
-   present you the old file.
+   albums.
 
 Q. Does this run in windows?
 A. :)
@@ -119,7 +53,8 @@ A. Never run your filesystem out of space. If you do, don't expect anything.
 Q. Thanks for the tough love about me being an idiot and running my filesystem
    out of space. It took me some time to get over how stupid I've been, but now
    I see that you are right. By the way, can I donate you any moneys?
-A. Please do.
+A. Please do. I will make donations public (unless you want to be anon) in
+   future versions of this README. Send donations to my email.
 
 Q. Say, now that I've donated you some money and you're big time balling, would
    you consider releasing this under another license?
