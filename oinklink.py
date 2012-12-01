@@ -25,7 +25,11 @@ j = lambda *p: os.path.join(*p)
 config = ConfigParser.ConfigParser()
 config_file=j(os.path.expanduser('~'),'.oinkfs')
 if os.path.isfile(config_file):
-    config.read(config_file)
+    try:
+        config.read(config_file)
+    except ConfigParser.ParsingError:
+        print bcolors.red + "your config file contains an error: most likely you're missing a space in front of an added perm_root dir" + bcolors.none
+        print sys.exc_info()[1]
 else:
     print "config file %s not found" % config_file
     sys.exit()
@@ -33,6 +37,8 @@ else:
 PERM_ROOT=unicode(config.get("oinklink", "PERM_ROOT"))
 ORIG_ROOT=unicode(config.get("oinklink", "ORIG_ROOT"))
 LINK_ROOT=unicode(config.get("oinklink", "LINK_ROOT"))
+
+PERM_ROOT=PERM_ROOT.split("\n")
 
 total_number_of_album_directories = 0
 total_number_of_directories_to_mk = 0
@@ -64,50 +70,54 @@ class Album:
         self.tracker = tracker.encode('utf-8')
 
         self.orig_path = j(ORIG_ROOT, tracker, album)
-        self.perm_path = j(PERM_ROOT, album)
         self.link_path = j(LINK_ROOT, tracker, album)
 
-        if os.path.isdir(self.perm_path) and not os.path.isdir(self.link_path):
-            for root, dirs, files in os.walk(self.orig_path):
-                for file in files:
-                    if file[-4:].lower() == ".log":
-                        self.orig_log_files.append(j(root,file).encode('utf-8'))
+        for perm_root in PERM_ROOT:
+            self.perm_path = j(perm_root, album)
+            del self.orig_log_files[:]
+            del self.orig_rip_times[:]
+            del self.perm_log_files[:]
+            del self.perm_rip_times[:]
 
-            for log in self.orig_log_files:
-                c = len(self.orig_rip_times)
-                for line in open(log,'r'):
-                    if "extraction logfile" in line:
-                        self.orig_rip_times.append(line)
-                if c == len(self.orig_rip_times):
-                    for line in io.open(log,'r',encoding='utf-16'):
+            if os.path.isdir(self.perm_path) and not os.path.isdir(self.link_path):
+
+                for root, dirs, files in os.walk(self.orig_path):
+                    for file in files:
+                        if file[-4:].lower() == ".log":
+                            self.orig_log_files.append(j(root,file).encode('utf-8'))
+
+                for log in self.orig_log_files:
+                    c = len(self.orig_rip_times)
+                    for line in open(log,'r'):
                         if "extraction logfile" in line:
                             self.orig_rip_times.append(line)
-                if c == len(self.orig_rip_times):
-                    print "error reading riptime from %s" % log
+                    if c == len(self.orig_rip_times):
+                        for line in io.open(log,'r',encoding='utf-16'):
+                            if "extraction logfile" in line:
+                                self.orig_rip_times.append(line)
+                    if c == len(self.orig_rip_times):
+                        print "error reading riptime from %s" % log
 
-            for root, dirs, files in os.walk(self.perm_path):
-                for file in files:
-                    if file[-4:].lower() == ".log":
-                        self.perm_log_files.append(j(root,file).encode('utf-8'))
+                for root, dirs, files in os.walk(self.perm_path):
+                    for file in files:
+                        if file[-4:].lower() == ".log":
+                            self.perm_log_files.append(j(root,file).encode('utf-8'))
 
-            for log in self.perm_log_files:
-                c = len(self.perm_rip_times)
-                for line in open(log,'r'):
-                    if "extraction logfile" in line:
-                        self.perm_rip_times.append(line)
-                if c == len(self.perm_rip_times):
-                    for line in io.open(log,'r',encoding='utf-16'):
+                for log in self.perm_log_files:
+                    c = len(self.perm_rip_times)
+                    for line in open(log,'r'):
                         if "extraction logfile" in line:
                             self.perm_rip_times.append(line)
-                if c == len(self.perm_rip_times):
-                    print "error reading riptime from %s" % log
+                    if c == len(self.perm_rip_times):
+                        for line in io.open(log,'r',encoding='utf-16'):
+                            if "extraction logfile" in line:
+                                self.perm_rip_times.append(line)
+                    if c == len(self.perm_rip_times):
+                        print "error reading riptime from %s" % log
 
-            if sorted(set(self.orig_rip_times)) == sorted(set(self.perm_rip_times)):
-                self.need_link = True
-#           sys.stdout.write('+')
-#       else:
-#           sys.stdout.write('.')
-
+                if sorted(set(self.orig_rip_times)) == sorted(set(self.perm_rip_times)):
+                    self.need_link = True
+                    break
 
     def __unicode__(self):
         return "%s" % (self.orig_path)
@@ -132,7 +142,6 @@ class Album:
         self.perm_dirs = []
         self.perm_files = []
         self.link_dirs = []
-#       self.link_files = dict()
 
         for root, dirs, files in os.walk(self.orig_path):
             for dir in dirs:
@@ -205,29 +214,37 @@ class Album:
 
             for perm_track in self.perm_files:
                 if is_song(orig_track.filename):
-                    if perm_track.md5 == orig_track.md5 and perm_track.possible_track_positions[0] in orig_track.possible_track_positions.values():
-#                       self.link_files[orig_track.linkfile] = perm_track.fullpath
-                        orig_track.match = perm_track.fullpath
-                        album_number_of_match_music_files += 1
-                        album_size_of_match_music_files += perm_track.size
+                    if perm_track.md5 == orig_track.md5:
+                        if len(perm_track.possible_track_positions) == 1 and len(orig_track.possible_track_positions) == 1 and perm_track.possible_track_positions.values() == orig_track.possible_track_positions.values():
+                            orig_track.match = perm_track.fullpath
+                            album_number_of_match_music_files += 1
+                            album_size_of_match_music_files += perm_track.size
+                            break
+                        else:
+                            orig_track.possible_matches.append(perm_track)
+
                 else:
                     if perm_track.md5 == orig_track.md5:
-#                       self.link_files[orig_track.linkfile] = perm_track.fullpath
                         orig_track.match = perm_track.fullpath
                         album_number_of_match_other_files += 1
                         album_size_of_match_other_files += perm_track.size
+            if not orig_track.match and orig_track.possible_matches:
+                for perm_track in orig_track.possible_matches:
+                    if 0 in perm_track.possible_track_positions.values() and perm_track.possible_track_positions[0] in orig_track.possible_track_positions.values():
+                        orig_track.match = perm_track.fullpath
+                        album_number_of_match_music_files += 1
+                        album_size_of_match_music_files += perm_track.size
+                        break
 
-#           if not orig_track.linkfile in self.link_files:
-#               self.link_files[orig_track.linkfile] = orig_track.fullpath
+            if not orig_track.match and orig_track.possible_matches:
+                orig_track.match = orig_track.possible_matches[0].fullpath
+                album_number_of_match_music_files += 1
+                album_size_of_match_music_files += orig_track.possible_matches[0].size
 
-
-#           if self.link_files[orig_track.linkfile].startswith(PERM_ROOT):
             if orig_track.match:
                 print bcolors.green + "%s" % orig_track.match + bcolors.blue + " -> %s" % orig_track.linkfile + bcolors.none
-#               print bcolors.green + "%s" % self.link_files[orig_track.linkfile] + bcolors.blue + " -> %s" % orig_track.linkfile + bcolors.none
             else:
                 print bcolors.red + "%s" % orig_track.fullpath + bcolors.blue + " -> %s" % orig_track.linkfile + bcolors.none
-#               print bcolors.red + "%s" % self.link_files[orig_track.linkfile] + bcolors.blue + " -> %s" % orig_track.linkfile + bcolors.none
 
         total_number_of_album_directories += album_number_of_album_directories
         total_number_of_directories_to_mk += album_number_of_directories_to_mk
@@ -294,7 +311,7 @@ class Track:
 
     def __init__(self, fullpath, filename):
         self.possible_track_positions = dict()
-
+        self.possible_matches = []
         self.fullpath = fullpath
         self.linkfile = self.fullpath.replace(ORIG_ROOT.encode('utf-8'), LINK_ROOT.encode('utf-8'), 1)
         self.filename = filename
@@ -355,7 +372,6 @@ def find_albums():
     for tracker in os.listdir(ORIG_ROOT):
         r = j(ORIG_ROOT, tracker)
         if os.path.isdir(r) and tracker != "torrents":
-#           for album in glob(r + '/*'):
             for album in os.listdir(r):
                 albums.append(Album(album, tracker))
     return albums
@@ -386,6 +402,8 @@ def main():
     albums[:] = [album for album in albums if album.need_link]
     albums.sort()
     print "number of matches with library: %d" % len(albums)
+    if not albums:
+        sys.exit()
 
     walk_albums(albums)
     pick_tracks(albums)
