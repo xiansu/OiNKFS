@@ -17,6 +17,7 @@ import re
 import ConfigParser
 import time
 import locale
+from collections import deque
 locale.setlocale(locale.LC_ALL, '')
 
 j = lambda *p: os.path.join(*p)
@@ -329,7 +330,11 @@ class bcolors:
 
 def md5song(file):
     f = open(file, 'rb')
-    f.seek(26)
+    flac = deque([],4)
+    fLaC = deque(['f','L','a','C'])
+    while flac != fLaC:
+        flac.append(f.read(1))
+    f.seek(22,1)
     return f.read(16).encode('hex_codec')
 
 def md5(file):
