@@ -80,14 +80,17 @@ class OiNKFS(Fuse):
 #            print "mythread: ticking"
 
     def getattr(self, path):
-        return os.lstat("." + path)
+        if os.path.isfile("." + path + ".slink"):
+            return os.stat("." + path + ".slink")
+        else:
+            return os.lstat("." + path)
 
     def readlink(self, path):
         return os.readlink("." + path)
 
     def readdir(self, path, offset):
         for e in os.listdir("." + path):
-            if e[-6:] != ".rdiff":
+            if e[-6:] != ".rdiff" and e[-6:] != ".slink":
                 yield fuse.Direntry(e)
 
     def unlink(self, path):
@@ -184,6 +187,7 @@ class OiNKFS(Fuse):
         global DEL_FILES
         oinkfile_fullpath = ""
         oinkfile_difffile = ""
+        oinkfile_smlnfile = ""
         oinkfile_tempfile = ""
         oinkfile_tempdirs = ""
 
@@ -191,21 +195,33 @@ class OiNKFS(Fuse):
         def __init__(self, path, flags, *mode):
             if not os.path.isdir("./tmp"):
                 os.makedirs("./tmp")
-            log = open("./tmp/oinkfs.log",'a')
             self.oinkfile_fullpath = "." + path
             self.oinkfile_difffile = "." + path + ".rdiff"
+            self.oinkfile_smlnfile = "." + path + ".slink"
+
+            log = open("./tmp/oinkfs.log",'a')
+
             if os.path.isfile(self.oinkfile_difffile):
                 self.oinkfile_tempfile = "." + "/tmp" + path
                 self.oinkfile_tempdirs = re.sub('[^/]*$', '', self.oinkfile_tempfile)
                 if not os.path.isdir(self.oinkfile_tempdirs):
                     os.makedirs(self.oinkfile_tempdirs)
+
                 if not os.path.isfile(self.oinkfile_tempfile):
-                    log.write("%s creating %s\n" % (time.strftime('%Y/%m/%d %H:%M:%S'), self.oinkfile_tempfile))
-                    patch = subprocess.Popen(['rdiff', 'patch', self.oinkfile_fullpath, self.oinkfile_difffile, self.oinkfile_tempfile], shell=False)
+                    log.write("%s accessing %s, creating %s\n" % (time.strftime('%Y/%m/%d %H:%M:%S'), self.oinkfile_fullpath, self.oinkfile_tempfile))
+                    if not os.path.isfile(self.oinkfile_smlnfile):
+                        patch = subprocess.Popen(['rdiff', 'patch', self.oinkfile_fullpath, self.oinkfile_difffile, self.oinkfile_tempfile], shell=False)
+                    else:
+                        patch = subprocess.Popen(['rdiff', 'patch', self.oinkfile_smlnfile, self.oinkfile_difffile, self.oinkfile_tempfile], shell=False)
                     patch.wait()
+                else:
+                    log.write("%s accessing %s, existing %s\n" % (time.strftime('%Y/%m/%d %H:%M:%S'), self.oinkfile_fullpath, self.oinkfile_tempfile))
+
                 self.file = os.fdopen(os.open(self.oinkfile_tempfile, flags, *mode), flag2mode(flags))
                 self.fd = self.file.fileno()
+
             else:
+                log.write("%s accessing %s, normal boring file\n" % (time.strftime('%Y/%m/%d %H:%M:%S'), self.oinkfile_fullpath))
                 self.file = os.fdopen(os.open(self.oinkfile_fullpath, flags, *mode), flag2mode(flags))
                 self.fd = self.file.fileno()
 

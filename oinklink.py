@@ -17,6 +17,7 @@ import re
 import ConfigParser
 import time
 import locale
+import shutil
 from collections import deque
 locale.setlocale(locale.LC_ALL, '')
 
@@ -269,9 +270,21 @@ class Album:
         for orig_file in self.orig_files:
             if not os.path.isfile(orig_file.linkfile):
                 if orig_file.match:
-                    os.link(orig_file.match, orig_file.linkfile)
+                    try:
+                        os.link(orig_file.match, orig_file.linkfile)
+                    except OSError:
+                        if sys.exc_info()[1].errno == 18:
+#                           print bcolors.yellow + "could not create hardlink, creating sym link instead: " + bcolors.green + "%s " % orig_file.match + bcolors.blue + "-> %s" % orig_file.linkfile + bcolors.none
+                            os.symlink(orig_file.match, orig_file.linkfile+".slink")
+                            padding = open(orig_file.linkfile, 'a')
+                            padding.write("%s" % orig_file.size)
                 else:
-                    os.link(orig_file.fullpath, orig_file.linkfile)
+                    try:
+                        os.link(orig_file.fullpath, orig_file.linkfile)
+                    except OSError:
+                        if sys.exc_info()[1].errno == 18:
+#                           print bcolors.yellow + "could not create hardlink, copying file over instead: " + bcolors.red + "%s " % orig_file.fullpath + bcolors.blue + "-> %s" % orig_file.linkfile + bcolors.none
+                            shutil.copyfile(orig_file.fullpath, orig_file.linkfile)
         return True
 
     def diff_track(self):
