@@ -80,22 +80,26 @@ class Album:
             del self.perm_log_files[:]
             del self.perm_rip_times[:]
 
-            if os.path.isdir(self.perm_path) and not os.path.isdir(self.link_path):
-
+            if os.path.isdir(self.perm_path) and (not os.path.isdir(self.link_path) or os.path.islink(self.link_path)):
                 for root, dirs, files in os.walk(self.orig_path):
                     for file in files:
                         if file[-4:].lower() == ".log":
                             self.orig_log_files.append(j(root,file).encode('utf-8'))
-
                 for log in self.orig_log_files:
                     c = len(self.orig_rip_times)
                     for line in open(log,'r'):
                         if "extraction logfile" in line:
                             self.orig_rip_times.append(line)
+
                     if c == len(self.orig_rip_times):
-                        for line in io.open(log,'r',encoding='utf-16'):
-                            if "extraction logfile" in line:
-                                self.orig_rip_times.append(line)
+                        try:
+                            for line in io.open(log,'r',encoding='utf-16'):
+                                if "extraction logfile" in line:
+                                    self.orig_rip_times.append(line)
+                        except UnicodeError:
+                            pass
+#                           print "couldn't find extraction time for %s in utf-8 and file is not utf-16" %log
+
                     if c == len(self.orig_rip_times):
                         print "error reading riptime from %s" % log
 
@@ -110,15 +114,30 @@ class Album:
                         if "extraction logfile" in line:
                             self.perm_rip_times.append(line)
                     if c == len(self.perm_rip_times):
-                        for line in io.open(log,'r',encoding='utf-16'):
-                            if "extraction logfile" in line:
-                                self.perm_rip_times.append(line)
+                        try:
+                            for line in io.open(log,'r',encoding='utf-16'):
+                                if "extraction logfile" in line:
+                                    self.perm_rip_times.append(line)
+                        except UnicodeError:
+                            pass
+#                           print "couldn't find extraction time for %s in utf-8 and file is not utf-16" %log
+
                     if c == len(self.perm_rip_times):
                         print "error reading riptime from %s" % log
 
                 if sorted(set(self.orig_rip_times)) == sorted(set(self.perm_rip_times)):
+# UNCOMMENT ALL THESE LINES IF YOU WANT TO MIRROR ORIG_ROOT WITH SYMLINKS
+#                   if os.path.islink(self.link_path):
+#                       print "match found for %s but %s exists, so removing link" % (self.orig_path, self.link_path)
+#                       os.unlink(self.link_path)
                     self.need_link = True
                     break
+#       if not self.need_link and not os.path.isdir(self.link_path):
+#           dircheck=re.sub('[^/]*$', '', self.link_path)
+#           print "symlinking %s since %s doesn't exist and no matches were found" % (self.orig_path, self.link_path)
+#           if not os.path.isdir(dircheck):
+#               os.makedirs(dircheck)
+#           os.symlink(self.orig_path, self.link_path)
 
     def __unicode__(self):
         return "%s" % (self.orig_path)
