@@ -219,11 +219,15 @@ class OiNKFS(Fuse):
 
                 self.file = os.fdopen(os.open(self.oinkfile_tempfile, flags, *mode), flag2mode(flags))
                 self.fd = self.file.fileno()
-
             else:
-                log.write("%s accessing %s, normal boring file\n" % (time.strftime('%Y/%m/%d %H:%M:%S'), self.oinkfile_fullpath))
-                self.file = os.fdopen(os.open(self.oinkfile_fullpath, flags, *mode), flag2mode(flags))
-                self.fd = self.file.fileno()
+                if os.path.isfile(self.oinkfile_smlnfile):
+                    log.write("%s accessing %s, following %s\n" % (time.strftime('%Y/%m/%d %H:%M:%S'), self.oinkfile_fullpath, self.oinkfile_smlnfile))
+                    self.file = os.fdopen(os.open(self.oinkfile_smlnfile, flags, *mode), flag2mode(flags))
+                    self.fd = self.file.fileno()
+                else:
+                    log.write("%s accessing %s, normal boring file\n" % (time.strftime('%Y/%m/%d %H:%M:%S'), self.oinkfile_fullpath))
+                    self.file = os.fdopen(os.open(self.oinkfile_fullpath, flags, *mode), flag2mode(flags))
+                    self.fd = self.file.fileno()
 
         def read(self, length, offset):
             self.file.seek(offset)

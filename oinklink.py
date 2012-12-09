@@ -15,6 +15,7 @@ import subprocess
 import hashlib
 import re
 import ConfigParser
+from optparse import OptionParser, OptionGroup
 import time
 import locale
 import shutil
@@ -23,23 +24,11 @@ locale.setlocale(locale.LC_ALL, '')
 
 j = lambda *p: os.path.join(*p)
 
-config = ConfigParser.ConfigParser()
-config_file=j(os.path.expanduser('~'),'.oinkfs')
-if os.path.isfile(config_file):
-    try:
-        config.read(config_file)
-    except ConfigParser.ParsingError:
-        print bcolors.red + "your config file contains an error: most likely you're missing a space in front of an added perm_root dir" + bcolors.none
-        print sys.exc_info()[1]
-else:
-    print "config file %s not found" % config_file
-    sys.exit()
-
-PERM_ROOT=unicode(config.get("oinklink", "PERM_ROOT"))
-ORIG_ROOT=unicode(config.get("oinklink", "ORIG_ROOT"))
-LINK_ROOT=unicode(config.get("oinklink", "LINK_ROOT"))
-
-PERM_ROOT=PERM_ROOT.split("\n")
+PERM_ROOT=[]
+ORIG_ROOT=""
+LINK_ROOT=""
+SYM_LINKS=False
+LINK_ORIG=False
 
 total_number_of_album_directories = 0
 total_number_of_directories_to_mk = 0
@@ -126,18 +115,23 @@ class Album:
                         print "error reading riptime from %s" % log
 
                 if sorted(set(self.orig_rip_times)) == sorted(set(self.perm_rip_times)):
-# UNCOMMENT ALL THESE LINES IF YOU WANT TO MIRROR ORIG_ROOT WITH SYMLINKS
-#                   if os.path.islink(self.link_path):
-#                       print "match found for %s but %s exists, so removing link" % (self.orig_path, self.link_path)
-#                       os.unlink(self.link_path)
+
+
+                    if LINK_ORIG and os.path.islink(self.link_path):
+                        print "match found for %s but %s exists, so removing link" % (self.orig_path, self.link_path)
+                        os.unlink(self.link_path)
+
+
                     self.need_link = True
                     break
-#       if not self.need_link and not os.path.isdir(self.link_path):
-#           dircheck=re.sub('[^/]*$', '', self.link_path)
-#           print "symlinking %s since %s doesn't exist and no matches were found" % (self.orig_path, self.link_path)
-#           if not os.path.isdir(dircheck):
-#               os.makedirs(dircheck)
-#           os.symlink(self.orig_path, self.link_path)
+
+
+        if LINK_ORIG and not self.need_link and not os.path.isdir(self.link_path):
+            dircheck=re.sub('[^/]*$', '', self.link_path)
+            print "symlinking %s since %s doesn't exist and no matches were found" % (self.orig_path, self.link_path)
+            if not os.path.isdir(dircheck):
+                os.makedirs(dircheck)
+            os.symlink(self.orig_path, self.link_path)
 
     def __unicode__(self):
         return "%s" % (self.orig_path)
@@ -278,7 +272,6 @@ class Album:
         total_size_of_total_other_files += album_size_of_total_other_files
 
         print "ALBUM: [ dirs: %d/%d ] [ music: %d/%d (%s/%s:%d%%) ] [ other: %d/%d (%s/%s:%d%%) ]" % (album_number_of_album_directories, album_number_of_directories_to_mk, album_number_of_match_music_files, album_number_of_total_music_files, locale.format("%d", album_size_of_match_music_files, grouping=True), locale.format("%d", album_size_of_total_music_files, grouping=True), (100*album_size_of_match_music_files/album_size_of_total_music_files), album_number_of_match_other_files, album_number_of_total_other_files, locale.format("%d", album_size_of_match_other_files, grouping=True), locale.format("%d", album_size_of_total_other_files, grouping=True), (100*album_size_of_match_other_files/album_size_of_total_other_files))
-
         print "TOTAL: [ dirs: %d/%d ] [ music: %d/%d (%s/%s:%d%%) ] [ other: %d/%d (%s/%s:%d%%) ]" % (total_number_of_album_directories, total_number_of_directories_to_mk, total_number_of_match_music_files, total_number_of_total_music_files, binary_bytes(total_size_of_match_music_files), binary_bytes(total_size_of_total_music_files), (100*total_size_of_match_music_files/total_size_of_total_music_files), total_number_of_match_other_files, total_number_of_total_other_files, binary_bytes(total_size_of_match_other_files), binary_bytes(total_size_of_total_other_files), (100*total_size_of_match_other_files/total_size_of_total_other_files))
         return True
 
@@ -289,21 +282,35 @@ class Album:
         for orig_file in self.orig_files:
             if not os.path.isfile(orig_file.linkfile):
                 if orig_file.match:
-                    try:
-                        os.link(orig_file.match, orig_file.linkfile)
-                    except OSError:
-                        if sys.exc_info()[1].errno == 18:
-#                           print bcolors.yellow + "could not create hardlink, creating sym link instead: " + bcolors.green + "%s " % orig_file.match + bcolors.blue + "-> %s" % orig_file.linkfile + bcolors.none
+                    if SYM_LINKS:
+                        if is_song(orig_file.filename):
                             os.symlink(orig_file.match, orig_file.linkfile+".slink")
                             padding = open(orig_file.linkfile, 'a')
                             padding.write("%s" % orig_file.size)
+                        else:
+                            os.symlink(orig_file.match, orig_file.linkfile)
+                    else:
+                        try:
+                            os.link(orig_file.match, orig_file.linkfile)
+                        except OSError:
+                            if sys.exc_info()[1].errno == 18:
+                                print bcolors.yellow + "could not create hardlink, creating sym link instead: " + bcolors.green + "%s " % orig_file.match + bcolors.blue + "-> %s" % orig_file.linkfile + bcolors.none
+                                if is_song(orig_file.filename):
+                                    os.symlink(orig_file.match, orig_file.linkfile+".slink")
+                                    padding = open(orig_file.linkfile, 'a')
+                                    padding.write("%s" % orig_file.size)
+                                else:
+                                    os.symlink(orig_file.match, orig_file.linkfile)
                 else:
-                    try:
-                        os.link(orig_file.fullpath, orig_file.linkfile)
-                    except OSError:
-                        if sys.exc_info()[1].errno == 18:
-#                           print bcolors.yellow + "could not create hardlink, copying file over instead: " + bcolors.red + "%s " % orig_file.fullpath + bcolors.blue + "-> %s" % orig_file.linkfile + bcolors.none
-                            shutil.copyfile(orig_file.fullpath, orig_file.linkfile)
+                    if SYM_LINKS:
+                        shutil.copyfile(orig_file.fullpath, orig_file.linkfile)
+                    else:
+                        try:
+                            os.link(orig_file.fullpath, orig_file.linkfile)
+                        except OSError:
+                            if sys.exc_info()[1].errno == 18:
+                                print bcolors.yellow + "could not create hardlink, copying file over instead: " + bcolors.red + "%s " % orig_file.fullpath + bcolors.blue + "-> %s" % orig_file.linkfile + bcolors.none
+                                shutil.copyfile(orig_file.fullpath, orig_file.linkfile)
         return True
 
     def diff_track(self):
@@ -429,6 +436,7 @@ def diff_tracks(albums):
     return True
 
 def main():
+    loadargs()
     albums = find_albums()
     print "number of albums found in path: %d" % len(albums)
     albums[:] = [album for album in albums if album.need_link]
@@ -448,5 +456,97 @@ def main():
     link_tracks(albums)
     diff_tracks(albums)
 
+def loadargs():
+    global PERM_ROOT
+    global ORIG_ROOT
+    global LINK_ROOT
+    global SYM_LINKS
+    global LINK_ORIG
+
+    argparser = OptionParser()
+    argparser.add_option("-c", "--conf-file", dest="CONF_FILE", help="specify configuration file [default: $HOME/.oinkfs]", default=j(os.path.expanduser('~'),'.oinkfs'))
+
+    requiredsettings = OptionGroup(argparser, "Required Settings", "These will be required if you don't load them from the config file!")
+    requiredsettings.add_option("-p", "--perm-root", dest="PERM_ROOT", help="comma delimited list of organized album directories")
+    requiredsettings.add_option("-o", "--orig-root", dest="ORIG_ROOT", help="original copies of albums inside $tracker directory")
+    requiredsettings.add_option("-l", "--link-root", dest="LINK_ROOT", help="directory to create links inside; need write access")
+    argparser.add_option_group(requiredsettings)
+
+    optionalsettings = OptionGroup(argparser, "Optional Settings", "Please read about and understand these options before you use them!")
+    optionalsettings.add_option("-s", "--sym-links", action="store_true", dest="SYM_LINKS", help="use symlinks instead of hardlinks for matched files")
+    optionalsettings.add_option("-m", "--link-orig", action="store_true", dest="LINK_ORIG", help="create symlinks for all unmatched album directories")
+    argparser.add_option_group(optionalsettings)
+
+    (options, args) = argparser.parse_args()
+
+    config_file=options.CONF_FILE
+    config = ConfigParser.ConfigParser()
+    if os.path.isfile(config_file):
+        try:
+            config.read(config_file)
+        except ConfigParser.ParsingError:
+            print bcolors.red + "your config file contains an error: most likely you're missing a space in front of an added perm_root dir" + bcolors.none
+            print sys.exc_info()[1]
+
+    if options.PERM_ROOT:
+        for perm_root in options.PERM_ROOT.split(","):
+            PERM_ROOT.append(unicode(perm_root.strip()))
+    else:
+        try:
+            PERM_ROOT=unicode(config.get("oinklink", "PERM_ROOT"))
+            PERM_ROOT=PERM_ROOT.split("\n")
+        except:
+            pass
+
+    if options.ORIG_ROOT:
+        ORIG_ROOT=unicode(options.ORIG_ROOT)
+    else:
+        try:
+            ORIG_ROOT=unicode(config.get("oinklink", "ORIG_ROOT"))
+        except:
+            pass
+
+    if options.LINK_ROOT:
+        LINK_ROOT=unicode(options.LINK_ROOT)
+    else:
+        try:
+            LINK_ROOT=unicode(config.get("oinklink", "LINK_ROOT"))
+        except:
+            pass
+
+    if options.SYM_LINKS:
+        SYM_LINKS=options.SYM_LINKS
+    else:
+        try:
+            if config.get("oinklink", "SYM_LINKS") == "1":
+                SYM_LINKS=True
+        except:
+            pass
+
+    if options.LINK_ORIG:
+        LINK_ORIG=options.LINK_ORIG
+    else:
+        try:
+            if config.get("oinklink", "LINK_ORIG") == "1":
+                LINK_ORIG=True
+        except:
+            pass
+
+    if not (PERM_ROOT and ORIG_ROOT and LINK_ROOT):
+        if not PERM_ROOT:
+            print "PERM_ROOT not defined"
+        if not ORIG_ROOT:
+            print "ORIG_ROOT not defined"
+        if not LINK_ROOT:
+            print "LINK_ROOT not defined"
+        sys.exit()
+
+    for perm_root in PERM_ROOT:
+        print "PERM_ROOT: %s" % perm_root
+    print "ORIG_ROOT: %s" % ORIG_ROOT
+    print "LINK_ROOT: %s" % LINK_ROOT
+    print "SYM_LINKS: %s" % SYM_LINKS
+    print "LINK_ORIG: %s" % LINK_ORIG
+    
 if __name__ == "__main__":
     sys.exit(main())
